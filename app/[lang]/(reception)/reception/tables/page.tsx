@@ -1,0 +1,465 @@
+'use client';
+
+export const dynamic = 'force-dynamic';
+
+import { useState } from 'react';
+import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { Search, Plus, Edit, Trash2 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/shared/LoadingSpinner';
+import { SlideableModal } from '@/components/shared/SlideableModal';
+import { DeleteConfirmModal } from '@/components/shared/DeleteConfirmModal';
+import { toast } from 'sonner';
+import { MdTableRestaurant } from 'react-icons/md';
+import { SiTicktick } from 'react-icons/si';
+import { MdOutlineCancel } from 'react-icons/md';
+import { LuDownload } from 'react-icons/lu';
+import { useTranslations } from '@/hooks/useTranslations';
+import QRCode from 'qrcode';
+import jsPDF from 'jspdf';
+
+// Mock table data
+const mockTables = [
+  { id: '1', number: 'Table 1', capacity: 4, status: 'AVAILABLE', qrCode: 'QR001' },
+  { id: '2', number: 'Table 2', capacity: 2, status: 'OCCUPIED', qrCode: 'QR002' },
+  { id: '3', number: 'Table 3', capacity: 6, status: 'AVAILABLE', qrCode: 'QR003' },
+  { id: '4', number: 'Table 4', capacity: 4, status: 'RESERVED', qrCode: 'QR004' },
+  { id: '5', number: 'Table 5', capacity: 8, status: 'OCCUPIED', qrCode: 'QR005' },
+  { id: '6', number: 'Table 6', capacity: 2, status: 'AVAILABLE', qrCode: 'QR006' },
+];
+
+export default function TablesPage() {
+  const { t, locale } = useTranslations();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [selectedTable, setSelectedTable] = useState<any>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [downloadingTableId, setDownloadingTableId] = useState<string | null>(null);
+
+  // Generate QR code URL for a table
+  const generateQRUrl = (tableNumber: string) => {
+    if (typeof window === 'undefined') return '';
+    // Using a default restaurant ID - in production, this would come from the restaurant context
+    const restaurantId = 'rest_001';
+    return `${window.location.origin}/${locale}/menu?restaurantId=${restaurantId}&tableId=${tableNumber}`;
+  };
+
+  // Download QR code as PDF
+  const handleDownloadQRCode = async (table: any) => {
+    try {
+      setDownloadingTableId(table.id);
+      toast.loading(t('tablesPage.downloadingQRCode'));
+
+      // Generate QR code URL
+      const qrUrl = generateQRUrl(table.number);
+      const qrData = JSON.stringify({
+        restaurantId: 'rest_001',
+        tableId: table.number,
+      });
+
+      // Generate QR code as data URL
+      const qrCodeDataUrl = await QRCode.toDataURL(qrData, {
+        width: 300,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF',
+        },
+      });
+
+      // Create PDF
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+
+      // Add title
+      pdf.setFontSize(20);
+      pdf.setTextColor(15, 118, 110); // Primary color
+      pdf.text('Table QR Code', pdfWidth / 2, 30, { align: 'center' });
+
+      // Add table information
+      pdf.setFontSize(14);
+      pdf.setTextColor(0, 0, 0);
+      pdf.text(`Table Number: ${table.number}`, pdfWidth / 2, 50, { align: 'center' });
+      pdf.text(`Capacity: ${table.capacity}`, pdfWidth / 2, 60, { align: 'center' });
+      
+      // Status with color
+      const statusColors: Record<string, [number, number, number]> = {
+        AVAILABLE: [34, 197, 94], // green
+        OCCUPIED: [239, 68, 68], // red
+        RESERVED: [234, 179, 8], // yellow
+      };
+      const statusColor = statusColors[table.status] || [0, 0, 0];
+      pdf.setTextColor(statusColor[0], statusColor[1], statusColor[2]);
+      pdf.text(`Status: ${table.status}`, pdfWidth / 2, 70, { align: 'center' });
+
+      // Add QR code image
+      const qrSize = 80; // mm
+      const qrX = (pdfWidth - qrSize) / 2;
+      const qrY = 90;
+      pdf.addImage(qrCodeDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
+
+      // Add URL below QR code
+      pdf.setFontSize(10);
+      pdf.setTextColor(100, 100, 100);
+      const urlY = qrY + qrSize + 15;
+      pdf.text('Scan this QR code to access the menu', pdfWidth / 2, urlY, { align: 'center' });
+      pdf.setFontSize(8);
+      pdf.setTextColor(0, 0, 0);
+      // Split long URLs across multiple lines
+      const urlLines = pdf.splitTextToSize(qrUrl, pdfWidth - 40);
+      urlLines.forEach((line: string, index: number) => {
+        pdf.text(line, pdfWidth / 2, urlY + 5 + index * 4, { align: 'center' });
+      });
+
+      // Add footer
+      pdf.setFontSize(8);
+      pdf.setTextColor(150, 150, 150);
+      pdf.text('Generated by CommanDex', pdfWidth / 2, pdfHeight - 10, { align: 'center' });
+
+      // Save PDF
+      pdf.save(`QR-Code-${table.number.replace(/\s+/g, '-')}.pdf`);
+
+      toast.dismiss();
+      toast.success(t('tablesPage.downloadQRCode') + ' ' + t('common.success'));
+    } catch (error) {
+      console.error('Error downloading QR code:', error);
+      toast.dismiss();
+      toast.error('Failed to download QR code');
+    } finally {
+      setDownloadingTableId(null);
+    }
+  };
+
+  const columns: GridColDef[] = [
+    { field: 'number', headerName: t('tablesPage.tableNumber'), width: 150, flex: 1 },
+    { field: 'capacity', headerName: t('tablesPage.capacity'), width: 120 },
+    {
+      field: 'status',
+      headerName: t('common.status'),
+      width: 150,
+      renderCell: (params) => {
+        const statusColors = {
+          AVAILABLE: 'bg-green-100 text-green-700',
+          OCCUPIED: 'bg-red-100 text-red-700',
+          RESERVED: 'bg-yellow-100 text-yellow-700',
+        };
+        const statusLabels = {
+          AVAILABLE: t('tablesPage.available'),
+          OCCUPIED: t('tablesPage.occupied'),
+          RESERVED: t('common.reserved'),
+        };
+        return (
+          <span
+            className={`px-3 py-1 rounded-full text-xs font-medium ${
+              statusColors[params.row.status as keyof typeof statusColors]
+            }`}
+          >
+            {statusLabels[params.row.status as keyof typeof statusLabels]}
+          </span>
+        );
+      },
+    },
+    { field: 'qrCode', headerName: t('tablesPage.qrCode'), width: 120 },
+    {
+      field: 'actions',
+      headerName: t('common.actions'),
+      width: 200,
+      renderCell: (params) => (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => handleDownloadQRCode(params.row)}
+            disabled={downloadingTableId === params.row.id}
+            className="p-1 text-blue-600 hover:bg-blue-50 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+            title={t('tablesPage.downloadQRCode')}
+          >
+            {downloadingTableId === params.row.id ? (
+              <LoadingSpinner size="sm" />
+            ) : (
+              <LuDownload size={16} />
+            )}
+          </button>
+          <button
+            onClick={() => {
+              setSelectedTable(params.row);
+              setIsEditModalOpen(true);
+            }}
+            className="p-1 text-primary hover:bg-primary-50 rounded"
+            title={t('common.edit')}
+          >
+            <Edit size={16} />
+          </button>
+          <button
+            onClick={() => {
+              setSelectedTable(params.row);
+              setIsDeleteModalOpen(true);
+            }}
+            className="p-1 text-red-500 hover:bg-red-50 rounded"
+            title={t('common.delete')}
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      ),
+    },
+  ];
+
+  const filteredTables = mockTables.filter((table) =>
+    table.number.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold text-primary">{t('tablesPage.title')}</h1>
+        <button
+          onClick={() => setIsAddModalOpen(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
+        >
+          <Plus size={20} />
+          {t('tablesPage.addTable')}
+        </button>
+      </div>
+
+      {/* Search Bar */}
+      <div className="bg-white rounded-lg shadow-sm p-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={20} />
+          <input
+            type="text"
+            placeholder={t('tablesPage.searchTables')}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-text-muted mb-1">{t('tablesPage.totalTables')}</p>
+              <p className="text-xl font-bold text-primary break-words">{mockTables.length}</p>
+            </div>
+            <div className="p-3 bg-primary-50 rounded-lg flex-shrink-0 ml-2">
+              <MdTableRestaurant size={32} className="text-primary" />
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-text-muted mb-1">{t('tablesPage.available')}</p>
+              <p className="text-xl font-bold text-green-600 break-words">
+                {mockTables.filter((t) => t.status === 'AVAILABLE').length}
+              </p>
+            </div>
+            <div className="p-3 bg-green-50 rounded-lg flex-shrink-0 ml-2">
+              <SiTicktick size={32} className="text-green-600" />
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-text-muted mb-1">{t('tablesPage.occupied')}</p>
+              <p className="text-xl font-bold text-red-600 break-words">
+                {mockTables.filter((t) => t.status === 'OCCUPIED').length}
+              </p>
+            </div>
+            <div className="p-3 bg-red-50 rounded-lg flex-shrink-0 ml-2">
+              <MdOutlineCancel size={32} className="text-red-600" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Tables Table */}
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <h3 className="text-lg font-semibold text-text-primary mb-4">{t('common.all')} {t('common.tables')}</h3>
+        <div style={{ height: 500, width: '100%' }}>
+          <DataGrid
+            rows={filteredTables}
+            columns={columns}
+            initialState={{
+              pagination: {
+                paginationModel: { pageSize: 10 },
+              },
+            }}
+            pageSizeOptions={[5, 10, 25]}
+            checkboxSelection
+            disableRowSelectionOnClick
+            sx={{
+              '& .MuiDataGrid-columnHeaders': {
+                backgroundColor: '#E6F7F6',
+                color: '#0F766E',
+                fontWeight: 'bold',
+              },
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Add Table Modal */}
+      <SlideableModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        title={t('tablesPage.addNewTable')}
+        size="md"
+        from="right"
+      >
+        <form className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-text-primary mb-2">
+              {t('tablesPage.tableNumber')}
+            </label>
+            <input
+              type="text"
+              className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              placeholder={t('tablesPage.exampleTable')}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-text-primary mb-2">{t('tablesPage.capacity')}</label>
+            <input
+              type="number"
+              className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              placeholder={t('tablesPage.exampleCapacity')}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-text-primary mb-2">{t('common.status')}</label>
+            <select className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+              <option value="AVAILABLE">{t('tablesPage.available')}</option>
+              <option value="OCCUPIED">{t('tablesPage.occupied')}</option>
+              <option value="RESERVED">{t('common.reserved')}</option>
+            </select>
+          </div>
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={() => setIsAddModalOpen(false)}
+              className="flex-1 px-4 py-2 border-2 border-border text-text-primary rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              {t('common.cancel')}
+            </button>
+            <button
+              type="submit"
+              className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
+            >
+              {t('tablesPage.addTable')}
+            </button>
+          </div>
+        </form>
+      </SlideableModal>
+
+      {/* Edit Table Modal */}
+      <SlideableModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setSelectedTable(null);
+        }}
+        title={t('tablesPage.editTable')}
+        size="md"
+        from="right"
+      >
+        {selectedTable && (
+          <form className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">
+                {t('tablesPage.tableNumber')}
+              </label>
+              <input
+                type="text"
+                defaultValue={selectedTable.number}
+                className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">{t('tablesPage.capacity')}</label>
+              <input
+                type="number"
+                defaultValue={selectedTable.capacity}
+                className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">{t('common.status')}</label>
+              <select
+                defaultValue={selectedTable.status}
+                className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="AVAILABLE">{t('tablesPage.available')}</option>
+                <option value="OCCUPIED">{t('tablesPage.occupied')}</option>
+                <option value="RESERVED">{t('common.reserved')}</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">{t('tablesPage.qrCode')}</label>
+              <input
+                type="text"
+                defaultValue={selectedTable.qrCode}
+                className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
+            <div className="flex gap-3 pt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  setSelectedTable(null);
+                }}
+                className="flex-1 px-4 py-2 border-2 border-border text-text-primary rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="submit"
+                className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
+              >
+                {t('common.saveChanges')}
+              </button>
+            </div>
+          </form>
+        )}
+      </SlideableModal>
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setSelectedTable(null);
+        }}
+        onConfirm={async () => {
+          setIsDeleting(true);
+          try {
+            // Simulate API call
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            toast.success(`Table ${selectedTable?.number} deleted successfully!`);
+            setIsDeleteModalOpen(false);
+            setSelectedTable(null);
+          } catch (error) {
+            toast.error('Failed to delete table');
+          } finally {
+            setIsDeleting(false);
+          }
+        }}
+        title={t('tablesPage.deleteTable')}
+        message={t('tablesPage.confirmDelete')}
+        itemName={selectedTable?.number}
+        isLoading={isDeleting}
+      />
+    </div>
+  );
+}
+
