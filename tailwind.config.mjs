@@ -8,15 +8,20 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: "#6FC3FF",
-        "primary-dark": "#5FB3EF",
-        "bg-dark": "var(--bg-dark)",
-        "bg-darker": "var(--bg-darker)",
-        "bg-light": "var(--bg-light)",
-        "bg-lighter": "var(--bg-lighter)",
-        "text-contrast": "var(--text-accent)",
-        "text-muted": "var(--text-muted)",
-        "card-bg": "var(--card-bg)",
+        primary: {
+          DEFAULT: "#0F766E",
+          50: "#E6F7F6",
+          100: "#CCEFED",
+          200: "#99DFDB",
+          300: "#66CFC9",
+          400: "#33BFB7",
+          500: "#0F766E",
+          600: "#0C5F58",
+          700: "#094842",
+          800: "#06302C",
+          900: "#031816",
+        },
+        "deep-green": "#0F766E",
       },
       backgroundColor: {
         main: "var(--background)",
@@ -34,8 +39,11 @@ export default {
         contrast: "var(--border)",
       },
       fontFamily: {
-        sans: ["var(--font-inter)", "sans-serif"],
-        serif: ["var(--font-playfair)", "serif"],
+        sans: ["var(--font-outfit)", "sans-serif"],
+        body: ["var(--font-outfit)", "sans-serif"],
+        heading: ["var(--font-chewy)", "cursive"],
+        chewy: ["var(--font-chewy)", "cursive"],
+        outfit: ["var(--font-outfit)", "sans-serif"],
       },
     },
   },

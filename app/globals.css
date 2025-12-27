@@ -2,10 +2,45 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* Primary Deep Green Color Scheme */
+  --primary: #0F766E;
+  --primary-light: #14B8A6;
+  --primary-dark: #0C5F58;
+  --primary-50: #E6F7F6;
+  --primary-100: #CCEFED;
+  
+  /* Background Colors */
+  --background: #FFFFFF;
+  --background-lighter: #F9FAFB;
+  --card-bg: #FFFFFF;
+  --bg-dark: #1F2937;
+  --bg-darker: #111827;
+  --bg-light: #F3F4F6;
+  --bg-lighter: #F9FAFB;
+  
+  /* Text Colors */
+  --text: #000000;
+  --text-primary: #111827;
+  --text-secondary: #4B5563;
+  --text-accent: #0F766E;
+  --text-muted: #6B7280;
+  --text-white: #FFFFFF;
+  
+  /* Border Colors */
+  --border: #E5E7EB;
+  --border-light: #F3F4F6;
+  
+  /* Status Colors */
+  --success: #10B981;
+  --warning: #F59E0B;
+  --error: #EF4444;
+  --info: #3B82F6;
+}
 
 @theme inline {
-  --font-sans: var(--font-inter);
-  --font-serif: var(--font-playfair);
+  --font-body: var(--font-outfit);
+  --font-heading: var(--font-chewy);
 }
 
 * {
@@ -15,8 +50,97 @@
 }
 
 body {
-  font-family: var(--font-inter), sans-serif;
+  font-family: var(--font-outfit), sans-serif;
   background: var(--background);
   color: var(--text);
 }
 
+/* Heading Styles - Use Chewy font */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-chewy), cursive;
+}
+
+/* Header text styles */
+header h1, header h2, header h3 {
+  font-family: var(--font-chewy), cursive;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-light);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-dark);
+}
+
+/* Slideable Modal Custom Styles */
+.slideable-modal {
+  background: white !important;
+}
+
+.slideable-modal .slide-pane__header {
+  background: white !important;
+  border-bottom: 1px solid var(--border) !important;
+  padding: 1.5rem !important;
+}
+
+.slideable-modal .slide-pane__title-wrapper {
+  margin: 0 !important;
+}
+
+.slideable-modal .slide-pane__content {
+  padding: 1.5rem !important;
+  background: white !important;
+}
+
+.slideable-modal-overlay {
+  background: rgba(0, 0, 0, 0.5) !important;
+  z-index: 9999 !important;
+}
+
+.slideable-modal-content {
+  height: 100%;
+  overflow-y: auto;
+}
+
+/* PWA Install Prompt Animation */
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
+}
+
+/* QR Scanner Styles */
+#qr-reader {
+  width: 100%;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+#qr-reader__dashboard {
+  display: none !important;
+}
+
+#qr-reader__camera_selection {
+  display: none !important;
+}
